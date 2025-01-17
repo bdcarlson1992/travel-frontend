@@ -47,7 +47,6 @@ interface ItineraryProps {
 }
 
 export const DestinationItinerary = ({ preferences, itineraryData }: ItineraryProps) => {
-  // Create costs object with dynamic categories first, then override with specific values
   const costs = {
     ...itineraryData.costs,
     transportation: itineraryData.costs.transportation || 0,
@@ -59,9 +58,11 @@ export const DestinationItinerary = ({ preferences, itineraryData }: ItineraryPr
 
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-8">
-      <div className="bg-white rounded-xl shadow-lg p-6">
-        <TripMap locations={itineraryData.locations} />
-      </div>
+      {itineraryData.locations && itineraryData.locations.length > 0 && (
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <TripMap locations={itineraryData.locations} />
+        </div>
+      )}
 
       <TravelRequirements requirements={itineraryData.requirements} />
       
@@ -75,7 +76,15 @@ export const DestinationItinerary = ({ preferences, itineraryData }: ItineraryPr
           <DailyItinerary
             key={day.day}
             plan={{
-              ...day,
+              day: day.day,
+              activities: day.activities,
+              meals: {
+                breakfast: day.meals?.breakfast || 'Local breakfast',
+                lunch: day.meals?.lunch || 'Local lunch',
+                dinner: day.meals?.dinner || 'Local dinner'
+              },
+              transportationType: day.transportationType || 'Walking',
+              accommodation: day.accommodation || 'Hotel',
               estimatedCosts: {
                 activities: day.estimatedCosts?.activities || 0,
                 meals: day.estimatedCosts?.meals || 0,
