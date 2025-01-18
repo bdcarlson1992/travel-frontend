@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MapPin, Users, Wallet, Heart, Calendar, CalendarDays, Sparkles, TreePine, Building } from 'lucide-react';
+import { MapPin, Wallet, Heart, Calendar, CalendarDays, Sparkles, TreePine, Building } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { TravelPreferences, Destination } from '../types';
@@ -16,7 +16,7 @@ const TravelSearch = () => {
   const [formData, setFormData] = useState<TravelPreferences>({
     startingPoint: '',
     tripType: [] as string[],
-    travelers: 1,
+    travelers: 1,  // Keep this as we might still need it for API calls
     month: '',
     specificDates: { start: '', end: '' },
     duration: 7,
@@ -38,7 +38,6 @@ const TravelSearch = () => {
   ];
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-
   const handleInputChange = (field: keyof TravelPreferences, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
@@ -54,6 +53,7 @@ const TravelSearch = () => {
     }
     handleInputChange('tripType', currentTypes);
   };
+
   const handleDateChange = (type: 'start' | 'end', value: string) => {
     const newDates = { ...formData.specificDates };
     newDates[type] = value;
@@ -102,7 +102,7 @@ const TravelSearch = () => {
       
       if (data.success) {
         setRecommendations(data.recommendations);
-        setStep(4);
+        setStep(3); // Updated to step 3 since we removed one step
       } else {
         console.error('Error:', data.error);
         alert('Failed to get recommendations. Please try again.');
@@ -114,11 +114,9 @@ const TravelSearch = () => {
       setLoading(false);
     }
   };
-
   const handleViewItinerary = async (destination: Destination) => {
     try {
       setLoading(true);
-      console.log('Viewing itinerary for:', destination);
       
       const response = await fetch(`${API_URL}/api/itinerary`, {
         method: 'POST',
@@ -132,18 +130,15 @@ const TravelSearch = () => {
       });
       
       const data = await response.json();
-      console.log('Itinerary response:', data);
       
       if (data.success && data.itinerary) {
         const rawItinerary = typeof data.itinerary === 'string' ? 
           JSON.parse(data.itinerary) : data.itinerary;
 
-        console.log('Raw itinerary:', rawItinerary);
-
         const transformedItinerary = {
           dailyItinerary: rawItinerary.dailyItinerary.map((day: any) => ({
             day: day.day,
-            activities: day.activities, // Keep activities as an array of objects
+            activities: day.activities,
             meals: {
               breakfast: day.meals?.breakfast || "Local breakfast",
               lunch: day.meals?.lunch || "Local lunch",
@@ -167,14 +162,12 @@ const TravelSearch = () => {
           },
           locations: rawItinerary.locations || []
         };
-
-        console.log('Transformed itinerary:', transformedItinerary);
   
         setSelectedDestination({ 
           ...destination, 
           itinerary: transformedItinerary
         });
-        setStep(5);
+        setStep(4);
       } else {
         throw new Error(data.error || 'Failed to load itinerary');
       }
@@ -185,7 +178,6 @@ const TravelSearch = () => {
       setLoading(false);
     }
   };
-
   const renderStep = () => {
     switch(step) {
       case 1:
@@ -231,32 +223,39 @@ const TravelSearch = () => {
             </div>
           </div>
         );
-
-      case 2:
+        case 2:
         return (
           <div className="space-y-6">
             <h2 className="text-xl font-bold text-blue-600 mb-4">Trip Details</h2>
-            <div className="space-y-1">
-              <label className="block text-gray-600 text-sm ml-1">How many people are traveling?</label>
-              <div className="relative">
-                <Users className="absolute left-3 top-3 text-blue-500 w-6 h-6" />
+            
+            {/* Budget Section */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-800">Budget Per Person</h3>
+              <p className="text-gray-600 text-sm">Including Flights, Accommodation, Food, Activities, etc.</p>
+              <div className="px-4">
+                <Wallet className="w-6 h-6 text-blue-500 mb-4" />
                 <input
-                  type="number"
-                  min="1"
-                  placeholder="Number of travelers"
-                  className="w-full p-3 pl-12 border-2 border-blue-200 rounded-xl"
-                  value={formData.travelers || ''}
-                  onChange={(e) => handleInputChange('travelers', parseInt(e.target.value))}
+                  type="range"
+                  min="100"
+                  max="10000"
+                  step="100"
+                  className="w-full h-2 bg-blue-200 rounded-lg"
+                  value={formData.budgetPerPerson}
+                  onChange={(e) => handleInputChange('budgetPerPerson', parseInt(e.target.value))}
                 />
-              </div>
-              {formData.travelers > 0 && (
-                <div className="text-sm text-gray-600 ml-1">
-                  {formData.travelers} {formData.travelers === 1 ? 'person' : 'people'} traveling
+                <div className="text-center mt-4">
+                  <div className="text-xl font-bold text-blue-600 mb-1">
+                    ${formData.budgetPerPerson}
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    Approximately ${Math.round(formData.budgetPerPerson / formData.duration)} per day
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
 
-            <div className="space-y-4">
+            {/* Dates Section */}
+            <div className="space-y-4 mt-8">
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
@@ -292,10 +291,11 @@ const TravelSearch = () => {
                 </select>
                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
                   <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                    <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
+                  <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
                   </svg>
                 </div>
               </div>
+
               {showDatePicker && (
                 <div className="space-y-4">
                   <div className="flex gap-4">
@@ -342,6 +342,7 @@ const TravelSearch = () => {
               )}
             </div>
 
+            {/* International Travel Option */}
             <div className="mt-8 border-t pt-6">
               <div className="flex items-center space-x-2">
                 <input
@@ -358,35 +359,7 @@ const TravelSearch = () => {
             </div>
           </div>
         );
-
-      case 3:
-        return (
-          <div className="space-y-6">
-            <h2 className="text-xl font-bold text-blue-600 mb-2">Budget Per Person</h2>
-            <p className="text-gray-600 text-sm mb-6">Including Flights, Accommodation, Food, Activities, etc.</p>
-            <div className="px-4">
-              <Wallet className="w-6 h-6 text-blue-500 mb-4" />
-              <input
-                type="range"
-                min="100"
-                max="10000"
-                step="100"
-                className="w-full h-2 bg-blue-200 rounded-lg"
-                value={formData.budgetPerPerson}
-                onChange={(e) => handleInputChange('budgetPerPerson', parseInt(e.target.value))}
-              />
-              <div className="text-center mt-4">
-                <div className="text-xl font-bold text-blue-600 mb-1">
-                  ${formData.budgetPerPerson}
-                </div>
-                <div className="text-sm text-gray-600">
-                  Approximately ${Math.round(formData.budgetPerPerson / formData.duration)} per day
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-        case 4:
+        case 3:
         return (
           <div className="space-y-6">
             <h2 className="text-xl font-bold text-blue-600 mb-4">Your Travel Recommendations</h2>
@@ -445,168 +418,155 @@ const TravelSearch = () => {
             })()}
           </div>
         );
-        case 5:
-  return selectedDestination ? (
-    <div className="space-y-8">
-      <h2 className="text-3xl font-bold text-gray-800 mb-6">
-        Your Trip to {selectedDestination.city}
-      </h2>
+        case 4:
+        return selectedDestination ? (
+          <div className="space-y-8">
+            <h2 className="text-3xl font-bold text-gray-800 mb-6">
+              Your Trip to {selectedDestination.city}
+            </h2>
 
-      {/* Trip Overview */}
-      <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-6">
-        <h3 className="text-xl font-bold text-blue-600 mb-4">Trip Overview</h3>
-        <p className="text-gray-700 leading-relaxed">
-          Based on your preferences for {formData.tripType.join(' and ')} and a budget of ${formData.budgetPerPerson} per person,
-          we've crafted a {formData.duration}-day journey to {selectedDestination.city}.
-          Perfect for {formData.travelers} {formData.travelers === 1 ? 'traveler' : 'travelers'} looking for
-          {formData.isInternational ? ' an international' : ' a'} getaway.
-        </p>
-      </div>
-
-      {/* Map View */}
-      {selectedDestination.itinerary?.locations && selectedDestination.itinerary.locations.length > 0 ? (
-        <div className="bg-white rounded-xl shadow-lg p-6">
-          <h3 className="text-xl font-bold text-blue-600 mb-4">Trip Map</h3>
-          <div className="h-96 rounded-lg overflow-hidden">
-            <MapContainer
-              center={[
-                selectedDestination.itinerary.locations[0].coordinates[0],
-                selectedDestination.itinerary.locations[0].coordinates[1]
-              ]}
-              zoom={13}
-              className="h-full w-full"
-            >
-              <TileLayer
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              />
-              {selectedDestination.itinerary.locations.map((location, index) => (
-                <Marker
-                  key={index}
-                  position={[location.coordinates[0], location.coordinates[1]]}
-                >
-                  <Popup>
-                    <div className="text-center">
-                      <h4 className="font-semibold">{location.name}</h4>
-                      <p className="text-sm text-gray-600">{location.type}</p>
-                    </div>
-                  </Popup>
-                </Marker>
-              ))}
-            </MapContainer>
-          </div>
-        </div>
-      ) : (
-        <div className="bg-white rounded-xl shadow-lg p-6">
-          <h3 className="text-xl font-bold text-blue-600 mb-4">Trip Map</h3>
-          <div className="h-96 rounded-lg overflow-hidden flex items-center justify-center bg-gray-50">
-            <p className="text-gray-500">Map data not available</p>
-          </div>
-        </div>
-      )}
-
-      {/* Daily Itinerary and Requirements */}
-      {selectedDestination.itinerary && (
-        <>
-          <TravelRequirements requirements={selectedDestination.itinerary.travelRequirements} />
-          <BudgetBreakdown
-            costs={{
-              transportation: selectedDestination.itinerary.budgetBreakdown.transportation,
-              accommodation: selectedDestination.itinerary.budgetBreakdown.accommodation,
-              activities: selectedDestination.itinerary.budgetBreakdown.activities,
-              food: selectedDestination.itinerary.budgetBreakdown.food,
-              misc: selectedDestination.itinerary.budgetBreakdown.misc
-            }}
-            budget={formData.budgetPerPerson}
-          />
-          {selectedDestination.itinerary.dailyItinerary.map((day) => {
-            console.log("About to render DailyItinerary with:", day.activities);
-
-            return (
-              <DailyItinerary
-                key={day.day}
-                plan={{
-                  day: day.day,
-                  activities: day.activities, // Just pass the activities array directly
-                  meals: {
-                    breakfast: day.meals?.breakfast || "Local breakfast",
-                    lunch: day.meals?.lunch || "Local lunch",
-                    dinner: day.meals?.dinner || "Local restaurant"
-                  },
-                  transportationType: day.transportationType || 'Walking',
-                  accommodation: day.accommodation || 'Hotel',
-                  estimatedCosts: {
-                    activities: day.estimatedCosts?.activities || 0,
-                    meals: day.estimatedCosts?.meals || 0,
-                    transport: day.estimatedCosts?.transport || 0
-                  }
-                }}
-              />
-            );
-          })}
-        </>
-      )}
-    </div>
-  ) : (
-    <div className="text-center py-8">
-      <p className="text-gray-600">Please select a destination to view itinerary.</p>
-    </div>
-  );
-
-default:
-  return null;
-
-    }
-  };
-
-  return (
-    <div className="max-w-2xl mx-auto p-6 bg-white rounded-2xl shadow-lg">
-      <div className="flex justify-between mb-6">
-        {[1, 2, 3].map((stepNumber) => (
-          <div key={stepNumber} className="flex items-center">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 
-              ${stepNumber <= step ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
-              {stepNumber}
+            {/* Trip Overview */}
+            <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-6">
+              <h3 className="text-xl font-bold text-blue-600 mb-4">Trip Overview</h3>
+              <p className="text-gray-700 leading-relaxed">
+                Based on your preferences for {formData.tripType.join(' and ')} and a budget of ${formData.budgetPerPerson} per person,
+                we've crafted a {formData.duration}-day journey to {selectedDestination.city}.
+              </p>
             </div>
-            {stepNumber < 3 && (
-              <div className={`w-16 h-1 mx-2 rounded ${
-                stepNumber < step ? 'bg-blue-500' : 'bg-gray-200'
-              }`} />
+
+            {/* Map View */}
+            {selectedDestination.itinerary?.locations && selectedDestination.itinerary.locations.length > 0 ? (
+              <div className="bg-white rounded-xl shadow-lg p-6">
+                <h3 className="text-xl font-bold text-blue-600 mb-4">Trip Map</h3>
+                <div className="h-96 rounded-lg overflow-hidden">
+                  <MapContainer
+                    center={[
+                      selectedDestination.itinerary.locations[0].coordinates[0],
+                      selectedDestination.itinerary.locations[0].coordinates[1]
+                    ]}
+                    zoom={13}
+                    className="h-full w-full"
+                  >
+                    <TileLayer
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    />
+                    {selectedDestination.itinerary.locations.map((location, index) => (
+                      <Marker
+                        key={index}
+                        position={[location.coordinates[0], location.coordinates[1]]}
+                      >
+                        <Popup>
+                          <div className="text-center">
+                            <h4 className="font-semibold">{location.name}</h4>
+                            <p className="text-sm text-gray-600">{location.type}</p>
+                          </div>
+                        </Popup>
+                      </Marker>
+                    ))}
+                  </MapContainer>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl shadow-lg p-6">
+                <h3 className="text-xl font-bold text-blue-600 mb-4">Trip Map</h3>
+                <div className="h-96 rounded-lg overflow-hidden flex items-center justify-center bg-gray-50">
+                  <p className="text-gray-500">Map data not available</p>
+                </div>
+              </div>
+            )}
+
+            {/* Daily Itinerary and Requirements */}
+            {selectedDestination.itinerary && (
+              <>
+                <TravelRequirements requirements={selectedDestination.itinerary.travelRequirements} />
+                <BudgetBreakdown
+                  costs={{
+                    transportation: selectedDestination.itinerary.budgetBreakdown.transportation,
+                    accommodation: selectedDestination.itinerary.budgetBreakdown.accommodation,
+                    activities: selectedDestination.itinerary.budgetBreakdown.activities,
+                    food: selectedDestination.itinerary.budgetBreakdown.food,
+                    misc: selectedDestination.itinerary.budgetBreakdown.misc
+                  }}
+                  budget={formData.budgetPerPerson}
+                />
+                {selectedDestination.itinerary.dailyItinerary.map((day) => (
+                  <DailyItinerary
+                    key={day.day}
+                    plan={{
+                      day: day.day,
+                      activities: day.activities,
+                      meals: day.meals,
+                      transportationType: day.transportationType,
+                      accommodation: day.accommodation,
+                      estimatedCosts: day.estimatedCosts
+                    }}
+                  />
+                ))}
+              </>
             )}
           </div>
-        ))}
-      </div>
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-gray-600">Please select a destination to view itinerary.</p>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+  return (
+    <div className="max-w-2xl mx-auto p-6 bg-white rounded-2xl shadow-lg">
+      {/* Only show progress bar for steps 1 and 2 */}
+      {step <= 2 && (
+        <div className="flex justify-between mb-6">
+          {[1, 2].map((stepNumber) => (
+            <div key={stepNumber} className="flex items-center">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 
+                ${stepNumber <= step ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
+                {stepNumber}
+              </div>
+              {stepNumber < 2 && (
+                <div className={`w-24 h-1 mx-2 rounded ${
+                  stepNumber < step ? 'bg-blue-500' : 'bg-gray-200'
+                }`} />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {loading ? (
         <div className="flex flex-col items-center justify-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
           <p className="mt-4 text-gray-600">
-            {step === 4 ? 'Loading your itinerary...' : 'Finding your perfect destinations...'}
+            {step === 3 ? 'Loading your itinerary...' : 'Finding your perfect destinations...'}
           </p>
         </div>
       ) : (
         <>
           {renderStep()}
-          <div className="mt-6 flex justify-between">
-            {step > 1 && step < 6 && (
-              <button
-                className="px-6 py-2 bg-gray-100 rounded-lg hover:bg-gray-200"
-                onClick={() => setStep(step - 1)}
-                disabled={loading}
-              >
-                Back
-              </button>
-            )}
-            {step < 4 && (
+          {step < 3 && (
+            <div className="mt-6 flex justify-between">
+              {step > 1 && (
+                <button
+                  className="px-6 py-2 bg-gray-100 rounded-lg hover:bg-gray-200"
+                  onClick={() => setStep(step - 1)}
+                  disabled={loading}
+                >
+                  Back
+                </button>
+              )}
               <button
                 className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 ml-auto disabled:opacity-50"
-                onClick={() => step < 3 ? setStep(step + 1) : handleSubmit()}
+                onClick={() => step < 2 ? setStep(step + 1) : handleSubmit()}
                 disabled={loading}
               >
-                {step === 3 ? (loading ? 'Finding...' : 'Find Adventures') : 'Next'}
+                {step === 2 ? (loading ? 'Finding...' : 'Find Adventures') : 'Next'}
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </>
       )}
     </div>

@@ -1,9 +1,10 @@
 // Activity interface for detailed activity information
 export interface Activity {
   name: string;
-  description: string;
   duration: string;
-  additionalInfo: string;
+  description: string;
+  details?: string[];  // Array of detailed breakdown points
+  additionalInfo?: string;
 }
 
 // EstimatedCosts interface
