@@ -1,3 +1,37 @@
+// Activity interface for detailed activity information
+export interface Activity {
+  name: string;
+  description: string;
+  duration: string;
+  additionalInfo: string;
+}
+
+// EstimatedCosts interface
+export interface EstimatedCosts {
+  activities: number;
+  meals: number;
+  transport: number;
+}
+
+// DayPlan interface for detailed daily itinerary
+export interface DayPlan {
+  day: number;
+  activities: Activity[];
+  meals: {
+    breakfast: string;
+    lunch: string;
+    dinner: string;
+  };
+  transportationType: string;
+  accommodation: string;
+  estimatedCosts: EstimatedCosts;
+}
+
+// Props interface for DailyItinerary component
+export interface DailyItineraryProps {
+  plan: DayPlan;
+}
+
 export interface TravelPreferences {
   startingPoint: string;
   tripType: string[];
@@ -25,22 +59,7 @@ export interface Destination {
   };
   activities: string[];
   itinerary?: {
-    dailyItinerary: Array<{
-      day: number;
-      activities: string[];
-      meals: {
-        breakfast: string;
-        lunch: string;
-        dinner: string;
-      };
-      transportationType: string;
-      accommodation: string;
-      estimatedCosts?: {
-        activities: number;
-        meals: number;
-        transport: number;
-      };
-    }>;
+    dailyItinerary: DayPlan[];  // Updated to use DayPlan interface
     travelRequirements: {
       visas: string[];
       vaccinations: string[];
@@ -61,5 +80,26 @@ export interface Destination {
 export interface ItineraryProps {
   preferences: TravelPreferences;
   destination: Destination;
-  itineraryData: any;
+  itineraryData: {
+    locations: Array<{
+      name: string;
+      coordinates: [number, number];
+      type: string;
+    }>;
+    requirements: {
+      visas: string[];
+      vaccinations: string[];
+      currencyTips: string[];
+      customs: string[];
+    };
+    costs: {
+      transportation: number;
+      accommodation: number;
+      activities: number;
+      food: number;
+      misc: number;
+      [key: string]: number;
+    };
+    days: DayPlan[];  // Updated to use DayPlan interface
+  };
 }

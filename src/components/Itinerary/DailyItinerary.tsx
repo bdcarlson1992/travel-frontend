@@ -1,34 +1,11 @@
-interface Activity {
-  name: string;
-  description: string;
-  duration: string;
-  additionalInfo: string;
-}
+import { type FC } from 'react';
+import { type DayPlan } from '../../types';
 
-interface EstimatedCosts {
-  activities: number;
-  meals: number;
-  transport: number;
-}
-
-interface DayPlan {
-  day: number;
-  activities: Activity[]; // Updated to match the correct structure
-  meals: {
-    breakfast: string;
-    lunch: string;
-    dinner: string;
-  };
-  transportationType: string;
-  accommodation: string;
-  estimatedCosts: EstimatedCosts;
-}
-
-interface DailyItineraryProps {
+interface Props {
   plan: DayPlan;
 }
 
-export const DailyItinerary = ({ plan }: DailyItineraryProps) => {
+export const DailyItinerary: FC<Props> = ({ plan }) => {
   console.log("Received plan:", plan);
   console.log("Activities:", plan.activities);
 
@@ -40,7 +17,7 @@ export const DailyItinerary = ({ plan }: DailyItineraryProps) => {
         <div>
           <h4 className="font-semibold text-gray-800 mb-2">Activities</h4>
           <ul className="space-y-2">
-            {plan.activities.map((activity, index) => (
+            {plan.activities.map((activity, index: number) => (
               <li key={index} className="text-gray-600">
                 <strong>{activity.name}</strong>: {activity.description} ({activity.duration})
                 <p className="text-sm text-gray-500">{activity.additionalInfo}</p>
@@ -81,7 +58,7 @@ export const DailyItinerary = ({ plan }: DailyItineraryProps) => {
             {Object.entries(plan.estimatedCosts).map(([category, amount]) => (
               <div key={category} className="text-center p-2 bg-gray-50 rounded-lg">
                 <p className="text-sm text-gray-600 capitalize">{category}</p>
-                <p className="font-bold text-blue-600">${amount}</p>
+                <p className="font-bold text-blue-600">${String(amount)}</p>
               </div>
             ))}
           </div>

@@ -1,4 +1,4 @@
-import { TravelPreferences, Destination } from '../../types';
+import { TravelPreferences, Destination, type DayPlan } from '../../types';
 import { TripMap } from './TripMap';
 import { BudgetBreakdown } from './BudgetBreakdown';
 import { TravelRequirements } from './TravelRequirements';
@@ -27,22 +27,7 @@ interface ItineraryProps {
       misc: number;
       [key: string]: number;
     };
-    days: Array<{
-      day: number;
-      activities: string[];
-      meals: {
-        breakfast: string;
-        lunch: string;
-        dinner: string;
-      };
-      transportationType: string;
-      accommodation: string;
-      estimatedCosts: {
-        activities: number;
-        meals: number;
-        transport: number;
-      };
-    }>;
+    days: Array<DayPlan>;
   };
 }
 
@@ -65,12 +50,12 @@ export const DestinationItinerary = ({ preferences, itineraryData }: ItineraryPr
       )}
 
       <TravelRequirements requirements={itineraryData.requirements} />
-      
+
       <BudgetBreakdown
         costs={costs}
         budget={preferences.budgetPerPerson}
       />
-      
+
       <div className="space-y-6">
         {itineraryData.days.map((day) => (
           <DailyItinerary
@@ -81,15 +66,15 @@ export const DestinationItinerary = ({ preferences, itineraryData }: ItineraryPr
               meals: {
                 breakfast: day.meals?.breakfast || 'Local breakfast',
                 lunch: day.meals?.lunch || 'Local lunch',
-                dinner: day.meals?.dinner || 'Local dinner'
+                dinner: day.meals?.dinner || 'Local dinner',
               },
               transportationType: day.transportationType || 'Walking',
               accommodation: day.accommodation || 'Hotel',
               estimatedCosts: {
                 activities: day.estimatedCosts?.activities || 0,
                 meals: day.estimatedCosts?.meals || 0,
-                transport: day.estimatedCosts?.transport || 0
-              }
+                transport: day.estimatedCosts?.transport || 0,
+              },
             }}
           />
         ))}
