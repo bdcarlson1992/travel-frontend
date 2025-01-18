@@ -6,33 +6,28 @@ interface Props {
 }
 
 export const DailyItinerary: FC<Props> = ({ plan }) => {
-  console.log("Received plan:", plan);
-  console.log("Activities:", plan.activities);
-
   return (
     <div className="bg-white rounded-xl shadow-lg p-6">
       <h3 className="text-xl font-bold text-blue-600 mb-4">Day {plan.day}</h3>
       <div className="space-y-6">
         {/* Activities Section */}
         <div>
-          <h4 className="font-semibold text-gray-800 mb-2">Activities</h4>
-          <ul className="space-y-2">
+          <h4 className="font-semibold text-gray-800 mb-3">Activities</h4>
+          <div className="space-y-4">
             {plan.activities.map((activity, index: number) => (
-              <li key={index} className="text-gray-600">
-                <strong>{activity.name}</strong>: {activity.description} ({activity.duration})
-                <p className="text-sm text-gray-500">{activity.additionalInfo}</p>
-              </li>
+              <div key={index} className="bg-gray-50 rounded-lg p-4">
+                <div className="flex justify-between items-start mb-2">
+                  <h5 className="font-semibold text-gray-800">{activity.name}</h5>
+                  <span className="text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                    {activity.duration}
+                  </span>
+                </div>
+                <p className="text-gray-600 mb-2">{activity.description}</p>
+                {activity.additionalInfo && (
+                  <p className="text-sm text-gray-500 italic">{activity.additionalInfo}</p>
+                )}
+              </div>
             ))}
-          </ul>
-        </div>
-
-        {/* Meals Section */}
-        <div className="border-t pt-4">
-          <h4 className="font-semibold text-gray-800 mb-2">Meals</h4>
-          <div className="space-y-1">
-            <p className="text-gray-600">Breakfast: {plan.meals.breakfast}</p>
-            <p className="text-gray-600">Lunch: {plan.meals.lunch}</p>
-            <p className="text-gray-600">Dinner: {plan.meals.dinner}</p>
           </div>
         </div>
 
@@ -54,10 +49,12 @@ export const DailyItinerary: FC<Props> = ({ plan }) => {
         {/* Estimated Costs Section */}
         <div className="border-t pt-4">
           <h4 className="font-semibold text-gray-800 mb-2">Estimated Costs</h4>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             {Object.entries(plan.estimatedCosts).map(([category, amount]) => (
               <div key={category} className="text-center p-2 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-600 capitalize">{category}</p>
+                <p className="text-sm text-gray-600 capitalize">
+                  {category.replace(/([A-Z])/g, ' $1').trim()}
+                </p>
                 <p className="font-bold text-blue-600">${String(amount)}</p>
               </div>
             ))}

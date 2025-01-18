@@ -16,8 +16,8 @@ export const BudgetBreakdown = ({ costs, budget }: BudgetBreakdownProps) => {
   const total = Object.values(costs).reduce((sum, amount) => sum + amount, 0);
   
   return (
-    <div className="bg-white rounded-xl shadow-lg p-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+      <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6 gap-2">
         <h3 className="text-xl font-bold text-blue-600">Budget Breakdown</h3>
         <div className="text-right">
           <p className="text-sm text-gray-600">Total Estimated Cost</p>
@@ -27,12 +27,12 @@ export const BudgetBreakdown = ({ costs, budget }: BudgetBreakdownProps) => {
 
       <div className="space-y-4">
         {Object.entries(costs).map(([category, amount]) => (
-          <div key={category} className="flex justify-between items-center">
-            <span className="text-gray-700 capitalize">
+          <div key={category} className="flex flex-col sm:flex-row sm:items-center gap-2">
+            <span className="text-gray-700 capitalize w-full sm:w-1/4">
               {category.replace(/([A-Z])/g, ' $1').trim()}
             </span>
-            <div className="flex items-center gap-4">
-              <div className="w-48 h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-3/4 justify-between">
+              <div className="h-2 bg-gray-200 rounded-full overflow-hidden flex-grow">
                 <div 
                   className="h-full bg-blue-500 rounded-full transition-all duration-500"
                   style={{ 
@@ -48,7 +48,7 @@ export const BudgetBreakdown = ({ costs, budget }: BudgetBreakdownProps) => {
         ))}
       </div>
 
-      <div className="mt-6 pt-4 border-t">
+      <div className="mt-6 pt-4 border-t space-y-2">
         <div className="flex justify-between text-sm text-gray-600">
           <span>Total Budget</span>
           <span>${budget.toLocaleString()}</span>
