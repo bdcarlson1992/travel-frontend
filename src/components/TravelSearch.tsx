@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { MapPin, Wallet, Heart, Calendar, CalendarDays, Sparkles, TreePine, Building } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { MapPin, Wallet, Heart, Calendar, CalendarDays, Sparkles, TreePine, Building, Share2 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { TravelPreferences, Destination } from '../types';
@@ -16,7 +16,7 @@ const TravelSearch = () => {
   const [formData, setFormData] = useState<TravelPreferences>({
     startingPoint: '',
     tripType: [] as string[],
-    travelers: 1,  // Keep this as we might still need it for API calls
+    travelers: 1,
     month: '',
     specificDates: { start: '', end: '' },
     duration: 7,
@@ -102,7 +102,7 @@ const TravelSearch = () => {
       
       if (data.success) {
         setRecommendations(data.recommendations);
-        setStep(3); // Updated to step 3 since we removed one step
+        setStep(3);
       } else {
         console.error('Error:', data.error);
         alert('Failed to get recommendations. Please try again.');
@@ -114,69 +114,191 @@ const TravelSearch = () => {
       setLoading(false);
     }
   };
-  const handleViewItinerary = async (destination: Destination) => {
-    try {
-      setLoading(true);
-      
-      const response = await fetch(`${API_URL}/api/itinerary`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          preferences: formData,
-          destination: destination
-        })
-      });
-      
-      const data = await response.json();
-      
-      if (data.success && data.itinerary) {
-        const rawItinerary = typeof data.itinerary === 'string' ? 
-          JSON.parse(data.itinerary) : data.itinerary;
 
-        const transformedItinerary = {
-          dailyItinerary: rawItinerary.dailyItinerary.map((day: any) => ({
-            day: day.day,
-            activities: day.activities,
-            meals: {
-              breakfast: day.meals?.breakfast || "Local breakfast",
-              lunch: day.meals?.lunch || "Local lunch",
-              dinner: day.meals?.dinner || "Local restaurant",
-            },
-            transportationType: day.transportationType || 'Walking',
-            accommodation: day.accommodation || 'Hotel',
-            estimatedCosts: {
-              activities: day.estimatedCosts?.activities || 0,
-              meals: day.estimatedCosts?.meals || 0,
-              transport: day.estimatedCosts?.transport || 0,
-            },
-          })),          
-          travelRequirements: rawItinerary.travelRequirements || {},
-          budgetBreakdown: {
-            transportation: rawItinerary.budgetBreakdown?.transportation || 0,
-            accommodation: rawItinerary.budgetBreakdown?.accommodation || 0,
-            activities: rawItinerary.budgetBreakdown?.activities || 0,
-            food: rawItinerary.budgetBreakdown?.food || 0,
-            misc: rawItinerary.budgetBreakdown?.miscellaneous || 0
-          },
-          locations: rawItinerary.locations || []
-        };
-  
-        setSelectedDestination({ 
-          ...destination, 
-          itinerary: transformedItinerary
-        });
-        setStep(4);
-      } else {
-        throw new Error(data.error || 'Failed to load itinerary');
+  const updateUrlWithItinerary = (destination: Destination) => {
+    const params = new URLSearchParams();
+    // Only store the minimal information needed to recreate the itinerary
+    const minimalData = {
+      city: destination.city,
+      country: destination.country,
+      prefs: {
+        startingPoint: formData.startingPoint,
+        tripType: formData.tripType,
+        duration: formData.duration,
+        budget: formData.budgetPerPerson,
+        month: formData.month,
+        dates: formData.specificDates
       }
-    } catch (error) {
-      console.error('Error:', error);
-      alert('Failed to load itinerary details');
-    } finally {
-      setLoading(false);
+    };
+    params.set('data', btoa(JSON.stringify(minimalData)));
+    window.history.pushState({}, '', `?${params.toString()}`);
+  };
+  
+const handleViewItinerary = async (destination: Destination) => {
+  try {
+    setLoading(true);
+    
+    // Clean and prepare the payload
+    const cleanDestination = {
+      city: destination.city,
+      country: destination.country,
+      matchScore: destination.matchScore || 0,
+      activities: destination.activities || [],
+      matchReason: destination.matchReason || ''
+    };
+
+    const cleanPreferences = {
+      startingPoint: formData.startingPoint.trim(),
+      tripType: formData.tripType,
+      travelers: Number(formData.travelers),
+      month: formData.month,
+      specificDates: {
+        start: formData.specificDates.start,
+        end: formData.specificDates.end
+      },
+      duration: Number(formData.duration),
+      budgetPerPerson: Number(formData.budgetPerPerson),
+      isInternational: formData.isInternational
+    };
+
+    const payload = {
+      preferences: cleanPreferences,
+      destination: cleanDestination
+    };
+    
+    console.log('Sending payload to server:', JSON.stringify(payload, null, 2));
+    
+    const response = await fetch(`${API_URL}/api/itinerary`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload, (key, value) => {
+        // Ensure no undefined values are sent
+        if (value === undefined) return null;
+        // Convert any potential number strings to actual numbers
+        if (typeof value === 'string' && !isNaN(Number(value))) return Number(value);
+        return value;
+      })
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Server error response:', errorText);
+      throw new Error(`HTTP error! status: ${response.status}\n${errorText}`);
     }
+    
+    const data = await response.json();
+    
+    if (data.success && data.itinerary) {
+      let rawItinerary;
+      try {
+        // Handle case where itinerary is a string with potential comments
+        if (typeof data.itinerary === 'string') {
+          // Remove any potential comments and normalize the JSON string
+          const cleanJsonString = data.itinerary
+            .replace(/\/\/.*/g, '') // Remove single-line comments
+            .replace(/\/\*[\s\S]*?\*\//g, '') // Remove multi-line comments
+            .replace(/\s+/g, ' ') // Normalize whitespace
+            .trim();
+          rawItinerary = JSON.parse(cleanJsonString);
+        } else {
+          rawItinerary = data.itinerary;
+        }
+      } catch (parseError) {
+        console.error('Error parsing itinerary:', parseError);
+        throw new Error('Failed to parse itinerary data');
+      }
+
+      // Rest of your transformation code remains the same
+      const transformedItinerary = {
+        dailyItinerary: (rawItinerary.dailyItinerary || []).map((day: any) => ({
+          day: day.day,
+          activities: day.activities,
+          meals: {
+            breakfast: day.meals?.breakfast || "Local breakfast",
+            lunch: day.meals?.lunch || "Local lunch",
+            dinner: day.meals?.dinner || "Local restaurant",
+          },
+          transportationType: day.transportationType || 'Walking',
+          accommodation: day.accommodation || 'Hotel',
+          estimatedCosts: {
+            activities: parseFloat(String(day.estimatedCosts?.activities || 0)),
+            meals: parseFloat(String(day.estimatedCosts?.meals || 0)),
+            transport: parseFloat(String(day.estimatedCosts?.transport || 0)),
+          },
+        })),          
+        travelRequirements: rawItinerary.travelRequirements || {},
+        budgetBreakdown: {
+          transportation: parseFloat(String(rawItinerary.budgetBreakdown?.transportation || 0)),
+          accommodation: parseFloat(String(rawItinerary.budgetBreakdown?.accommodation || 0)),
+          activities: parseFloat(String(rawItinerary.budgetBreakdown?.activities || 0)),
+          food: parseFloat(String(rawItinerary.budgetBreakdown?.food || 0)),
+          misc: (() => {
+            const miscValue = rawItinerary.budgetBreakdown?.miscellaneous || 0;
+            if (typeof miscValue === 'string' && miscValue.includes('-')) {
+              const [min, max] = miscValue.split('-').map(num => parseFloat(num));
+              return (min + max) / 2;
+            }
+            return parseFloat(String(miscValue));
+          })(),
+        },
+        locations: rawItinerary.locations || []
+      };
+
+      setSelectedDestination({ 
+        ...destination, 
+        itinerary: transformedItinerary
+      });
+      updateUrlWithItinerary(destination);
+      setStep(4);
+    } else {
+      throw new Error(data.error || 'No itinerary data received');
+    }
+  } catch (error: unknown) {
+    console.error('Error details:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    alert(`Failed to load itinerary details: ${errorMessage}`);
+  } finally {
+    setLoading(false);
+  }
+};
+
+  const ShareButton = () => {
+    const [copied, setCopied] = useState(false);
+
+    const handleShare = async () => {
+      const currentUrl = window.location.href;
+
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: 'My Travel Itinerary',
+            url: currentUrl
+          });
+        } catch (err) {
+          console.log('Error sharing:', err);
+        }
+      } else {
+        try {
+          await navigator.clipboard.writeText(currentUrl);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        } catch (err) {
+          console.log('Error copying to clipboard:', err);
+        }
+      }
+    };
+
+    return (
+      <button
+        onClick={handleShare}
+        className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
+      >
+        <Share2 className="w-4 h-4" />
+        {copied ? 'Copied!' : 'Share Itinerary'}
+      </button>
+    );
   };
   const renderStep = () => {
     switch(step) {
@@ -223,39 +345,14 @@ const TravelSearch = () => {
             </div>
           </div>
         );
-        case 2:
+
+      case 2:
         return (
           <div className="space-y-6">
             <h2 className="text-xl font-bold text-blue-600 mb-4">Trip Details</h2>
             
-            {/* Budget Section */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-800">Budget Per Person</h3>
-              <p className="text-gray-600 text-sm">Including Flights, Accommodation, Food, Activities, etc.</p>
-              <div className="px-4">
-                <Wallet className="w-6 h-6 text-blue-500 mb-4" />
-                <input
-                  type="range"
-                  min="100"
-                  max="10000"
-                  step="100"
-                  className="w-full h-2 bg-blue-200 rounded-lg"
-                  value={formData.budgetPerPerson}
-                  onChange={(e) => handleInputChange('budgetPerPerson', parseInt(e.target.value))}
-                />
-                <div className="text-center mt-4">
-                  <div className="text-xl font-bold text-blue-600 mb-1">
-                    ${formData.budgetPerPerson}
-                  </div>
-                  <div className="text-sm text-gray-600">
-                    Approximately ${Math.round(formData.budgetPerPerson / formData.duration)} per day
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {/* Dates Section */}
-            <div className="space-y-4 mt-8">
+            <div className="space-y-4">
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
@@ -273,7 +370,6 @@ const TravelSearch = () => {
                   I have specific dates in mind
                 </label>
               </div>
-
               <div className="relative">
                 <Calendar className="absolute left-3 top-3 text-blue-500 w-6 h-6" />
                 <select
@@ -291,12 +387,12 @@ const TravelSearch = () => {
                 </select>
                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
                   <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                  <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
+                    <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
                   </svg>
                 </div>
               </div>
 
-              {showDatePicker && (
+              {showDatePicker ? (
                 <div className="space-y-4">
                   <div className="flex gap-4">
                     <div className="flex-1">
@@ -325,21 +421,54 @@ const TravelSearch = () => {
                     </div>
                   )}
                 </div>
-              )}
-              
-              {!showDatePicker && (
-                <div className="relative">
-                  <CalendarDays className="absolute left-3 top-3 text-blue-500 w-6 h-6" />
-                  <input
-                    type="number"
-                    min="1"
-                    placeholder="Number of days"
-                    className="w-full p-3 pl-12 border-2 border-blue-200 rounded-xl"
-                    value={formData.duration || ''}
-                    onChange={(e) => handleInputChange('duration', parseInt(e.target.value))}
-                  />
+              ) : (
+                <div className="space-y-4">
+                  <h3 className="text-gray-800">Number of Days</h3>
+                  <div className="px-4">
+                    <CalendarDays className="w-6 h-6 text-blue-500 mb-4" />
+                    <input
+                      type="range"
+                      min="1"
+                      max="30"
+                      step="1"
+                      className="w-full h-2 bg-blue-200 rounded-lg"
+                      value={formData.duration}
+                      onChange={(e) => handleInputChange('duration', parseInt(e.target.value))}
+                    />
+                    <div className="text-center mt-4">
+                      <div className="text-xl font-bold text-blue-600 mb-1">
+                        {formData.duration} {formData.duration === 1 ? 'Day' : 'Days'}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
+            </div>
+
+            {/* Budget Section */}
+            <div className="space-y-4 mt-8">
+              <h3 className="text-gray-800">Budget Per Person</h3>
+              <p className="text-gray-600 text-sm">Including Flights, Accommodation, Food, Activities, etc.</p>
+              <div className="px-4">
+                <Wallet className="w-6 h-6 text-blue-500 mb-4" />
+                <input
+                  type="range"
+                  min="100"
+                  max="10000"
+                  step="100"
+                  className="w-full h-2 bg-blue-200 rounded-lg"
+                  value={formData.budgetPerPerson}
+                  onChange={(e) => handleInputChange('budgetPerPerson', parseInt(e.target.value))}
+                />
+                <div className="text-center mt-4">
+                  <div className="text-xl font-bold text-blue-600 mb-1">
+                    ${formData.budgetPerPerson}
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    Approximately ${Math.round(formData.budgetPerPerson / formData.duration)} per day
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* International Travel Option */}
@@ -418,13 +547,16 @@ const TravelSearch = () => {
             })()}
           </div>
         );
-        case 4:
+
+      case 4:
         return selectedDestination ? (
           <div className="space-y-8">
-            <h2 className="text-3xl font-bold text-gray-800 mb-6">
-              Your Trip to {selectedDestination.city}
-            </h2>
-
+            <div className="flex justify-between items-center">
+              <h2 className="text-3xl font-bold text-gray-800">
+                Your Trip to {selectedDestination.city}
+              </h2>
+              <ShareButton />
+            </div>
             {/* Trip Overview */}
             <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-6">
               <h3 className="text-xl font-bold text-blue-600 mb-4">Trip Overview</h3>
@@ -479,7 +611,11 @@ const TravelSearch = () => {
             {/* Daily Itinerary and Requirements */}
             {selectedDestination.itinerary && (
               <>
-                <TravelRequirements requirements={selectedDestination.itinerary.travelRequirements} />
+                <TravelRequirements 
+                  requirements={selectedDestination.itinerary.travelRequirements}
+                  startingPoint={formData.startingPoint}
+                  destination={`${selectedDestination.city}, ${selectedDestination.country}`}
+                />
                 <BudgetBreakdown
                   costs={{
                     transportation: selectedDestination.itinerary.budgetBreakdown.transportation,
@@ -516,6 +652,23 @@ const TravelSearch = () => {
         return null;
     }
   };
+
+  // URL handling effect
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const encodedItinerary = params.get('itinerary');
+    
+    if (encodedItinerary) {
+      try {
+        const decodedData = JSON.parse(atob(encodedItinerary));
+        setFormData(decodedData.preferences);
+        handleViewItinerary(decodedData.destination);
+      } catch (error) {
+        console.error('Error loading shared itinerary:', error);
+      }
+    }
+  }, []);
+
   return (
     <div className="max-w-2xl mx-auto p-6 bg-white rounded-2xl shadow-lg">
       {/* Only show progress bar for steps 1 and 2 */}
